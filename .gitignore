@@ -1,0 +1,5 @@
+venv/
+__pycache__/
+*.pyc
+uno_games.json
+.env
