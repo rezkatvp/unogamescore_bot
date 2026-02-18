@@ -23,7 +23,8 @@ from aiogram.types import (
 
 # ---------------- CONFIG ----------------
 
-TOKEN = "BOT_TOKEN"  # <-- встав свій токен
+import os
+TOKEN = os.getenv("BOT_TOKEN")
 DATA_FILE = Path("uno_games.json")
 
 logging.basicConfig(level=logging.INFO)
