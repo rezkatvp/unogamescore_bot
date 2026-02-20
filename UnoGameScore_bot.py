@@ -81,7 +81,7 @@ class Store:
         except Exception as e:
             log.error("Save error: %s", e)
     
-    def create_game(self, creator_uid: str) -> str:
+    def create_game(self, creator_d: str) -> str:
         """Створює нову гру і повертає код"""
         code = generate_game_code()
         while code in self.games_by_code:
@@ -89,7 +89,7 @@ class Store:
         
         self.games_by_code[code] = {
             "status": "awaiting_players",
-            "created_by": creator_uid,
+            "created_by": creator_d,
             "players": {},
             "scores": {},
             "wins": {},
@@ -100,7 +100,7 @@ class Store:
             "active_round": None,
             "awaiting_custom_target_from": None,
         }
-        self.user_games[creator_uid] = code
+        self.user_games[creator_d] = code
         self.save()
         return code
     
@@ -190,6 +190,31 @@ def ikb_mode() -> InlineKeyboardMarkup:
     ])
 
 # Кнопки більше не потрібні - бот сам звертається до кожного гравця
+
+def ikb_start_menu() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🎮 Створити гру", callback_data="start:new")],
+        [InlineKeyboardButton(text="🔑 Приєднатись по коду", callback_data="start:join")],
+        [InlineKeyboardButton(text="📊 Мій рахунок", callback_data="start:score")],
+        [
+            InlineKeyboardButton(text="📜 Історія", callback_data="start:history"),
+            InlineKeyboardButton(text="🏆 Топ", callback_data="start:top"),
+        ],
+        [InlineKeyboardButton(text="↩️ Undo", callback_data="start:undo")],
+        [InlineKeyboardButton(text="🏳️ Вийти з гри", callback_data="start:leave")],
+    ])
+
+START_TEXT = (
+    "Я — <b>UNO Score</b>, бот, який чесно рахуватиме всі ваші штрафні бали, щоб ніхто не зміг схитрувати!\n\n"
+    "🚀 <b>Швидкий старт:</b>\n"
+    "• Створити гру (ти стаєш хостом)\n"
+    "• Приєднатись по коду\n\n"
+    "🏆 <b>В процесі гри:</b>\n"
+    "• Рахунок, історія, топ\n"
+    "• Відкотити раунд\n"
+    "• Вийти з гри\n\n"
+    "Забудь про папір та ручку. Тисни кнопку нижче і погнали 🎴"
+)
 
 def ikb_remove_player(game: Dict[str, Any]) -> InlineKeyboardMarkup:
     rows = []
@@ -332,17 +357,7 @@ def all_filled(game: Dict[str, Any]) -> bool:
 
 @router.message(CommandStart())
 async def start(message: Message):
-    await message.answer(
-        "Привіт! Я UNO-бот для підрахунку штрафних балів 🎴\n\n"
-        "• /new — створити гру\n"
-        "• /join код — приєднатись до гри\n"
-        "• /score — рахунок\n"
-        "• /history — історія раундів\n"
-        "• /top — топ гравців\n"
-        "• /undo — відкотити раунд\n"
-        "• /leave — вийти з гри\n\n"
-        "Всі повідомлення будуть в приватному чаті з ботом!"
-    )
+    await message.answer(START_TEXT, reply_markup=ikb_start_menu())
 
 @router.message(F.text == "❓ Help")
 @router.message(Command("help"))
@@ -355,6 +370,66 @@ async def help_cmd(message: Message):
         "Команди: /new /score /undo /cancel",
         reply_markup=kb_main()
     )
+
+@router.callback_query(F.data.startswith("start:"))
+async def start_menu_router(cb: CallbackQuery):
+    action = cb.data.split(":", 1)[1]
+    await cb.answer()
+
+    # Робимо UX: прибираємо "крутилку", але повідомлення не чіпаємо
+    # (можеш замінити на edit_text, якщо хочеш оновлювати той самий меседж)
+
+    if action == "new":
+        fake = Message.model_validate({**cb.message.model_dump(), "text": "/new"})
+        fake.from_user = cb.from_user
+        fake.chat = cb.message.chat
+        fake.bot = cb.bot
+        await new_game(fake)
+        return
+
+    if action == "join":
+        await cb.message.answer("Введи код так: <code>/join A1B2</code>")
+        return
+
+    if action == "score":
+        fake = Message.model_validate({**cb.message.model_dump(), "text": "/score"})
+        fake.from_user = cb.from_user
+        fake.chat = cb.message.chat
+        fake.bot = cb.bot
+        await score(fake)
+        return
+
+    if action == "history":
+        fake = Message.model_validate({**cb.message.model_dump(), "text": "/history"})
+        fake.from_user = cb.from_user
+        fake.chat = cb.message.chat
+        fake.bot = cb.bot
+        await history_cmd(fake)
+        return
+
+    if action == "top":
+        fake = Message.model_validate({**cb.message.model_dump(), "text": "/top"})
+        fake.from_user = cb.from_user
+        fake.chat = cb.message.chat
+        fake.bot = cb.bot
+        await top_cmd(fake)
+        return
+
+    if action == "undo":
+        fake = Message.model_validate({**cb.message.model_dump(), "text": "/undo"})
+        fake.from_user = cb.from_user
+        fake.chat = cb.message.chat
+        fake.bot = cb.bot
+        await undo(fake)
+        return
+
+    if action == "leave":
+        fake = Message.model_validate({**cb.message.model_dump(), "text": "/leave"})
+        fake.from_user = cb.from_user
+        fake.chat = cb.message.chat
+        fake.bot = cb.bot
+        await leave_game(fake)
+        return
 
 # ---------------- NEW / CANCEL ----------------
 
