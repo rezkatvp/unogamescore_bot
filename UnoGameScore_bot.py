@@ -1,8 +1,3 @@
-# UnoGameScore_bot.py
-# Stable UNO scorekeeper bot for aiogram 3.25.0
-# Logic: /new in group -> lobby join -> set target -> set mode -> rounds -> score/undo/cancel
-# Storage: JSON file per chat
-
 import asyncio
 import json
 import logging
@@ -20,6 +15,13 @@ from aiogram.types import (
     InlineKeyboardMarkup, InlineKeyboardButton,
     ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 )
+from aiogram.types import (
+    Message, CallbackQuery,
+    InlineKeyboardMarkup, InlineKeyboardButton,
+    ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+)
+
+from aiohttp import web
 
 # ---------------- CONFIG ----------------
 
@@ -959,12 +961,35 @@ async def numeric_router(message: Message):
         except Exception:
             pass
 
+async def start_health_server():
+    """
+    Render Web Service очікує, що додаток відкриє порт.
+    Цей маленький HTTP сервер відповідає на / та /health.
+    """
+    app = web.Application()
+
+    async def health(_request):
+        return web.Response(text="ok")
+
+    app.router.add_get("/", health)
+    app.router.add_get("/health", health)
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+
+    port = int(os.getenv("PORT", "10000"))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+
+    log.info("Health server started on port %s", port)
+
 # ---------------- RUN ----------------
 
 async def main():
     bot = Bot(TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
     dp = Dispatcher()
     dp.include_router(router)
+    await start_health_server()
     log.info("Start polling...")
     await dp.start_polling(bot)
 
