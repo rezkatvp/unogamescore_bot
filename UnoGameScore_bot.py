@@ -15,11 +15,6 @@ from aiogram.types import (
     InlineKeyboardMarkup, InlineKeyboardButton,
     ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 )
-from aiogram.types import (
-    Message, CallbackQuery,
-    InlineKeyboardMarkup, InlineKeyboardButton,
-    ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
-)
 
 from aiohttp import web
 
@@ -81,7 +76,11 @@ class Store:
         except Exception as e:
             log.error("Save error: %s", e)
     
-    def create_game(self, creator_d: str) -> str:
+    def create_game(self, creator_uid: str) -> str:
+    ...
+    "created_by": creator_uid,
+    ...
+    self.user_games[creator_uid] = code
         """Створює нову гру і повертає код"""
         code = generate_game_code()
         while code in self.games_by_code:
@@ -376,14 +375,10 @@ async def start_menu_router(cb: CallbackQuery):
     action = cb.data.split(":", 1)[1]
     await cb.answer()
 
-    # Робимо UX: прибираємо "крутилку", але повідомлення не чіпаємо
-    # (можеш замінити на edit_text, якщо хочеш оновлювати той самий меседж)
+    base = cb.message
 
     if action == "new":
-        fake = Message.model_validate({**cb.message.model_dump(), "text": "/new"})
-        fake.from_user = cb.from_user
-        fake.chat = cb.message.chat
-        fake.bot = cb.bot
+        fake = base.model_copy(update={"text": "/new", "from_user": cb.from_user})
         await new_game(fake)
         return
 
@@ -392,42 +387,27 @@ async def start_menu_router(cb: CallbackQuery):
         return
 
     if action == "score":
-        fake = Message.model_validate({**cb.message.model_dump(), "text": "/score"})
-        fake.from_user = cb.from_user
-        fake.chat = cb.message.chat
-        fake.bot = cb.bot
+        fake = base.model_copy(update={"text": "/score", "from_user": cb.from_user})
         await score(fake)
         return
 
     if action == "history":
-        fake = Message.model_validate({**cb.message.model_dump(), "text": "/history"})
-        fake.from_user = cb.from_user
-        fake.chat = cb.message.chat
-        fake.bot = cb.bot
+        fake = base.model_copy(update={"text": "/history", "from_user": cb.from_user})
         await history_cmd(fake)
         return
 
     if action == "top":
-        fake = Message.model_validate({**cb.message.model_dump(), "text": "/top"})
-        fake.from_user = cb.from_user
-        fake.chat = cb.message.chat
-        fake.bot = cb.bot
+        fake = base.model_copy(update={"text": "/top", "from_user": cb.from_user})
         await top_cmd(fake)
         return
 
     if action == "undo":
-        fake = Message.model_validate({**cb.message.model_dump(), "text": "/undo"})
-        fake.from_user = cb.from_user
-        fake.chat = cb.message.chat
-        fake.bot = cb.bot
+        fake = base.model_copy(update={"text": "/undo", "from_user": cb.from_user})
         await undo(fake)
         return
 
     if action == "leave":
-        fake = Message.model_validate({**cb.message.model_dump(), "text": "/leave"})
-        fake.from_user = cb.from_user
-        fake.chat = cb.message.chat
-        fake.bot = cb.bot
+        fake = base.model_copy(update={"text": "/leave", "from_user": cb.from_user})
         await leave_game(fake)
         return
 
